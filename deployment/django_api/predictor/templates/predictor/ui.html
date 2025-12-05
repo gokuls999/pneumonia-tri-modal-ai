@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pneumonia AI Predictor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 30px auto;
+      padding: 0 15px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+    }
+    .card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+    }
+    input[type="file"],
+    textarea {
+      width: 100%;
+      margin-top: 5px;
+    }
+    textarea {
+      min-height: 80px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #eef;
+      border-radius: 8px;
+      display: none;
+    }
+    .error {
+      background: #ffe0e0 !important;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pneumonia AI Predictor</h1>
+  <div class="card">
+    <form id="predict-form">
+      <label for="xray">Chest X-ray image (JPG/PNG)</label>
+      <input type="file" id="xray" name="xray" accept="image/*" required>
+
+      <label for="ct">CT Scan image (optional, JPG/PNG)</label>
+      <input type="file" id="ct" name="ct" accept="image/*">
+
+      <label for="clinical_text">Clinical text / symptoms</label>
+      <textarea id="clinical_text" name="clinical_text" placeholder="Example: High fever, cough, shortness of breath for 3 days." required></textarea>
+
+      <button type="submit" id="submit-btn">Predict</button>
+    </form>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("predict-form");
+    const resultDiv = document.getElementById("result");
+    const submitBtn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const xrayInput = document.getElementById("xray");
+      const ctInput = document.getElementById("ct");
+      const textInput = document.getElementById("clinical_text");
+
+      if (!xrayInput.files[0] || !textInput.value.trim()) {
+        alert("Please provide both X-ray image and clinical text.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("xray", xrayInput.files[0]);
+
+      if (ctInput.files[0]) {
+        formData.append("ct", ctInput.files[0]);
+      }
+      
+      formData.append("clinical_text", textInput.value.trim());
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Predicting...";
+      resultDiv.style.display = "none";
+      resultDiv.classList.remove("error");
+      resultDiv.textContent = "";
+
+      try {
+        const response = await fetch("/api/predict/", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          resultDiv.classList.add("error");
+          resultDiv.textContent = "Error: " + (data.error || "Unknown error");
+        } else {
+          resultDiv.classList.remove("error");
+
+          let html = `
+            <strong>Prediction:</strong> ${data.predicted_class}<br>
+            <strong>Confidence:</strong> ${(data.confidence * 100).toFixed(2)}%<br>
+            <strong>Clinical text:</strong> ${data.clinical_text}
+          `;
+
+          if (data.ct_predicted_class) {
+            html += `
+              <hr style="margin: 12px 0;">
+              <strong>CT Prediction:</strong> ${data.ct_predicted_class}<br>
+              <strong>CT Confidence:</strong> ${(data.ct_confidence * 100).toFixed(2)}%<br>
+            `;
+          }
+
+          if (data.gradcam_url) {
+            html += `
+              <div style="margin-top: 15px;">    
+                <strong>Grad-CAM heatmap:</strong><br>
+                <img src="${data.gradcam_url}"
+                     alt="Grad-CAM heatmap" 
+                     style="max-width: 100%; margin-top: 8px; border-radius: 8px; border: 1px solid #ccc;">
+              </div>    
+            `;     
+          }
+          
+          resultDiv.innerHTML = html;
+        }  
+      } catch (err) {
+        resultDiv.classList.add("error");
+        resultDiv.textContent = "Request failed: " + err;
+      } finally {
+        resultDiv.style.display = "block";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Predict";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+ai-env/
+env/
+venv/
+
+# VS Code
+.vscode/
+
+# Django
+db.sqlite3
+/media/
+staticfiles/
+
+# Model checkpoints
+*.pth
+models/checkpoints/
+
+# Large datasets
+data/
+!data/README.md   # allow readme placeholder
+
+# Cache
+*.log
+*.cache/
