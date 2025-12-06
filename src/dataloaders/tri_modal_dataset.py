@@ -36,8 +36,20 @@ class TriModalDataset(Dataset):
         xray_path = self.xray_root / row["xray_path"]
         ct_path = self.ct_root / row["ct_path"]
         text = row["clinical_text"]
-        label = int(row["label"])
-
+        _label_raw = str(row["label"]).strip()
+        if _label_raw.isdigit():
+            label = int(_label_raw)
+        else:
+            label_map = {"NORMAL": 0, "PNEUMONIA": 1, "PNEUMONIA ": 1}  # tolerate minor spacing
+            label = label_map.get(_label_raw.upper(), None)
+            if label is None:
+        # fallback: try to infer from common words
+                if "normal" in _label_raw.lower():
+                    label = 0
+                elif "pneumonia" in _label_raw.lower() or "covid" in _label_raw.lower():
+                    label = 1
+                else:
+                    label = 0
         xray_img = self.transform(Image.open(xray_path))
         ct_img = self.transform(Image.open(ct_path))
 

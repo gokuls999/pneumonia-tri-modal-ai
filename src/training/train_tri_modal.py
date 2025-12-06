@@ -21,7 +21,7 @@ BATCH_SIZE = 4
 EPOCHS = 2   # you can increase later
 LR = 1e-4
 
-CSV_PATH = ROOT / "data" / "processed" / "tri_modal_pairs.csv"
+CSV_PATH = ROOT / "data" / "processed" / "tri_dataset_v2.csv"
 DATA_ROOT = ROOT / "data"
 
 TOKENIZER = AutoTokenizer.from_pretrained("bert-base-uncased")
