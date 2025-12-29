@@ -13,7 +13,7 @@ CLASS_MAP = {0: "NORMAL", 1: "PNEUMONIA"}
 
 # Load model
 MODEL = TriModalPneumoniaNet()
-MODEL.load_state_dict(torch.load(CKPT_PATH, map_location=DEVICE))
+MODEL.load_state_dict(torch.load(CKPT_PATH, map_location=DEVICE), strict=False)
 MODEL.to(DEVICE)
 MODEL.eval()
 

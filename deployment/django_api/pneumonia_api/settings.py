@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'predictor',
+    'patients',
 ]
 
 MIDDLEWARE = [
@@ -126,7 +127,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 import os
 from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = str(Path(__file__).resolve().parents[3] / "media")
 
 

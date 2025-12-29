@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Pneumonia Tri-Modal — Hospital Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Optional icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0d6efd;
+      --muted: #6c757d;
+      --panel: #f8fafc;
+      --card-border: #e6eefc;
+      --accent: #0b5ed7;
+    }
+    body { background:#f4f7fb; font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#14202b; }
+    .topbar { background: linear-gradient(90deg, rgba(13,110,253,0.06), rgba(11,94,215,0.03)); border-bottom:1px solid rgba(11,94,215,0.06); }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:0.2px; font-size:20px; }
+    .subtitle { color:var(--muted); font-size:13px; }
+    .panel { background: white; border:1px solid var(--card-border); border-radius:10px; padding:18px; box-shadow: 0 6px 18px rgba(14,45,75,0.02); }
+    label { font-weight:600; }
+    .img-card { border-radius:8px; border:1px solid #edf3ff; padding:8px; width:230px; background:#fff; text-align:center; }
+    .img-card img { max-width:200px; max-height:150px; object-fit:contain; display:block; margin:6px auto; background:#f8fafd; border-radius:6px;}
+    .muted { color:var(--muted); font-size:13px; }
+    .small-note { font-size:12px; color:#707a84; }
+    footer { font-size:13px; color:#6b7280; padding:18px 0; text-align:center; margin-top:18px; }
+    .btn-brand { background:var(--brand); color:white; border:none; }
+    .grid { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; }
+    .left { flex: 1 1 520px; min-width:320px; }
+    .right { width:380px; }
+    @media(max-width:900px){ .grid { flex-direction:column } .right{ width:100% } .img-card{ width:48% } }
+  </style>
+</head>
+<body>
+  <!-- Topbar -->
+  <nav class="topbar py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-3">
+        <div class="brand"><i class="fa-solid fa-hospital"></i> MedVision AI</div>
+        <div class="subtitle">Pneumonia Tri-Modal Inference</div>
+      </div>
+      <div>
+        <a href="/patients/register/" class="btn btn-sm btn-outline-primary me-2">Patient Register</a>
+        <a href="/patients/login/" class="btn btn-sm btn-outline-secondary me-2">Patient Login</a>
+        <a href="/admin/login/" class="btn btn-sm btn-warning">Admin</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="container my-4">
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <h3 class="mb-1">Tri-Modal Pneumonia — Inference</h3>
+          <div class="muted">Upload X-ray + CT and clinical notes, or use repository-relative file paths for quick tests.</div>
+        </div>
+        <div class="text-end small-note">
+          <div>Model: Research Prototype</div>
+          <div>Mode: Demo</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- Left: inputs & result -->
+        <section class="left">
+          <div class="panel mb-3">
+            <label class="mb-2">Input mode</label>
+            <div class="d-flex gap-3 mb-2">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="mode" id="modeUpload" value="upload" checked>
+                <label class="form-check-label" for="modeUpload">Upload files</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="mode" id="modePaths" value="paths">
+                <label class="form-check-label" for="modePaths">Use file paths</label>
+              </div>
+            </div>
+
+            <!-- Upload area -->
+            <div id="upload-area">
+              <div class="mb-2">
+                <label for="xray_file">X-ray (JPEG/PNG)</label>
+                <input id="xray_file" type="file" accept="image/*" class="form-control form-control-sm">
+              </div>
+              <div class="mb-2">
+                <label for="ct_file">CT (JPEG/PNG)</label>
+                <input id="ct_file" type="file" accept="image/*" class="form-control form-control-sm">
+              </div>
+              <div class="mb-2">
+                <label for="text_upload">Clinical notes</label>
+                <textarea id="text_upload" rows="3" class="form-control">Routine check up, no major respiratory complaints.</textarea>
+              </div>
+              <div class="d-flex gap-2">
+                <button id="run-upload" class="btn btn-brand"><i class="fa-solid fa-play me-1"></i> Run Inference</button>
+                <button id="clear-upload" class="btn btn-outline-secondary">Clear</button>
+                <div class="ms-auto small-note align-self-center">Uploaded images will be previewed on the right.</div>
+              </div>
+            </div>
+
+            <!-- Paths area -->
+            <div id="paths-area" style="display:none;">
+              <div class="mb-2">
+                <label for="xray_path">X-ray path (relative to repo root)</label>
+                <input id="xray_path" type="text" class="form-control form-control-sm" value="data/raw/chest_xray/chest_xray/train/NORMAL/IM-0742-0001.jpeg">
+              </div>
+              <div class="mb-2">
+                <label for="ct_path">CT path (relative to repo root)</label>
+                <input id="ct_path" type="text" class="form-control form-control-sm" value="data/ct_raw/sarscov2/NORMAL/Non-Covid (536).png">
+              </div>
+              <div class="mb-2">
+                <label for="text_path">Clinical notes</label>
+                <textarea id="text_path" rows="3" class="form-control">Routine check up, no major respiratory complaints.</textarea>
+              </div>
+              <div class="d-flex gap-2">
+                <button id="run-path" class="btn btn-brand"><i class="fa-solid fa-play me-1"></i> Run Inference (paths)</button>
+                <button id="clear-path" class="btn btn-outline-secondary">Clear</button>
+                <div class="ms-auto small-note align-self-center">Paths are resolved server-side from project root.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Result area -->
+          <div class="panel mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="mb-0">Inference Result</h5>
+              <div class="small-note">Prediction & artifacts</div>
+            </div>
+            <pre id="result-box" class="mb-2">No result yet.</pre>
+
+            <div class="d-flex gap-2">
+              <button id="generate-pdf" class="btn btn-outline-primary" disabled><i class="fa-solid fa-file-pdf me-1"></i> Generate PDF report</button>
+              <button id="simulate-report" class="btn btn-outline-secondary">Simulate Demo Scores</button>
+              <div class="ms-auto muted">PDF will include Grad-CAM images and report summary.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right: previews and images -->
+        <aside class="right">
+          <div class="panel mb-3">
+            <h6 class="mb-2">Selected / Output Images</h6>
+            <div id="images" class="d-flex flex-wrap gap-2" aria-live="polite">
+              <!-- image cards injected here -->
+            </div>
+            <div class="small-note mt-2">If server returns absolute filesystem paths, UI attempts to convert them to /media/ URLs.</div>
+          </div>
+
+          <div class="panel">
+            <h6 class="mb-2">Quick Actions</h6>
+            <div class="d-grid gap-2">
+              <a id="link-latest-report" class="btn btn-sm btn-outline-success disabled" target="_blank" rel="noopener">Open last report</a>
+              <a href="/reports/" class="btn btn-sm btn-outline-info">All Reports</a>
+              <a href="/patients/" class="btn btn-sm btn-outline-primary">Patients</a>
+            </div>
+          </div>
+        </aside>
+      </div> <!-- grid -->
+    </div> <!-- main panel -->
+
+    <footer class="mt-3">
+      &copy; <strong>MedVision AI</strong> — Pneumonia Tri-Modal Prototype &middot; Confidential research demo
+    </footer>
+  </main>
+
+  <!-- Bootstrap JS (bundle includes Popper) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Client logic (complete) -->
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const resultBox = $('result-box');
+  const imagesDiv = $('images');
+  const generateBtn = $('generate-pdf');
+  const linkLatest = $('link-latest-report');
+
+  // mode toggle
+  const modeUpload = $('modeUpload'), modePaths = $('modePaths');
+  const uploadArea = $('upload-area'), pathsArea = $('paths-area');
+  modeUpload.addEventListener('change', () => { uploadArea.style.display='block'; pathsArea.style.display='none'; });
+  modePaths.addEventListener('change', () => { uploadArea.style.display='none'; pathsArea.style.display='block'; });
+
+  // file inputs
+  const xfileInput = $('xray_file'), ctfileInput = $('ct_file');
+
+  // util: convert server path -> web URL (robust)
+  function pathToUrl(p){
+    if (!p) return null;
+    try{
+      // pass-through already URLs
+      if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('/')) return p;
+
+      const norm = p.replace(/\\\\/g, '/').replace(/\\/g, '/');
+
+      // common case: contains /media/
+      const mediaIdx = norm.indexOf('/media/');
+      if (mediaIdx >= 0) return norm.slice(mediaIdx);
+
+      // sometimes server returns absolute filesystem path under a MEDIA_ROOT like ".../deployment/media/gradcam/xxx.png"
+      // try to find "media/" and return '/media/...' for the browser
+      const parts = norm.split('/');
+      const mi = parts.lastIndexOf('media');
+      if (mi >= 0) return '/' + parts.slice(mi).join('/');
+
+      // fallback: if looks like an image file, attempt to return last two segments under /media/
+      if (/\.(png|jpe?g|gif)$/i.test(norm)) {
+        const segs = norm.split('/');
+        return '/media/' + segs.slice(-2).join('/');
+      }
+
+      // last resort
+      return norm;
+    }catch(e){
+      return p;
+    }
+  }
+
+  // show image cards
+  function showImages(result){
+    imagesDiv.innerHTML = '';
+    const items = [
+      ['xray_gradcam','X-ray GradCAM'],
+      ['xray_segmentation','X-ray Segmentation'],
+      ['ct_gradcam','CT GradCAM'],
+      ['ct_segmentation','CT Segmentation'],
+    ];
+    items.forEach(([k,label])=>{
+      const p = result[k];
+      if (!p) return;
+      const url = pathToUrl(p);
+      const card = document.createElement('div'); card.className='img-card';
+      const t = document.createElement('div'); t.textContent = label; t.style.fontWeight='600';
+      const img = document.createElement('img'); img.src = url; img.alt = label;
+      img.onerror = () => {
+        img.style.display='none';
+        const msg = document.createElement('div');
+        msg.textContent='Preview not available';
+        msg.className='muted';
+        card.appendChild(msg);
+      };
+      const dl = document.createElement('a');
+      dl.href = url;
+      dl.target = '_blank';
+      dl.rel = 'noopener';
+      dl.textContent = 'Download';
+      dl.className = 'btn btn-sm btn-outline-primary mt-2';
+      card.appendChild(t); card.appendChild(img); card.appendChild(dl);
+      imagesDiv.appendChild(card);
+    });
+  }
+
+  // track last inference
+  let lastInference = null;
+
+  // safeFetch helper that always returns parsed JSON (or text fallback)
+  async function safeFetch(url, opts){
+    const res = await fetch(url, opts);
+    let data;
+    try { data = await res.json(); } catch(e){ data = { error: 'Invalid JSON from server', text: await res.text() }; }
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  // RUN: PATHS
+  $('run-path').addEventListener('click', async () => {
+    const payload = {
+      xray_path: $('xray_path').value.trim(),
+      ct_path: $('ct_path').value.trim(),
+      text: $('text_path').value.trim()
+    };
+    resultBox.textContent = 'Running inference (paths)...';
+    imagesDiv.innerHTML = ''; generateBtn.disabled = true; linkLatest.classList.add('disabled');
+    try {
+      const { ok, data } = await safeFetch('/api/tri-infer/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      resultBox.textContent = JSON.stringify(data, null, 2);
+      if (ok) {
+        lastInference = data;
+        showImages(data);
+        generateBtn.disabled = false;
+        // server might return pdf_url or report_url
+        const reportUrl = data.pdf_url || data.report_url || data.reportUrl || data.report_url;
+        if (reportUrl) {
+          linkLatest.href = reportUrl;
+          linkLatest.classList.remove('disabled');
+        }
+      } else {
+        lastInference = null; generateBtn.disabled = true;
+      }
+    } catch (err) {
+      resultBox.textContent = 'Client error: ' + String(err);
+      lastInference = null; generateBtn.disabled = true;
+    }
+  });
+
+  // RUN: UPLOAD
+  $('run-upload').addEventListener('click', async () => {
+    const xfile = xfileInput.files[0], ctfile = ctfileInput.files[0];
+    const text = $('text_upload').value.trim();
+    if (!xfile || !ctfile) { alert('Please choose both X-ray and CT files'); return; }
+    resultBox.textContent = 'Uploading files and running inference...';
+    imagesDiv.innerHTML = ''; generateBtn.disabled = true; linkLatest.classList.add('disabled');
+    try {
+      const fd = new FormData();
+      fd.append('xray_file', xfile); fd.append('ct_file', ctfile); fd.append('text', text);
+      const { ok, data } = await safeFetch('/api/tri-infer-upload/', { method: 'POST', body: fd });
+      resultBox.textContent = JSON.stringify(data, null, 2);
+      if (ok) {
+        lastInference = data;
+        showImages(data);
+        generateBtn.disabled = false;
+        const reportUrl = data.pdf_url || data.report_url || data.reportUrl || data.report_url;
+        if (reportUrl) { linkLatest.href = reportUrl; linkLatest.classList.remove('disabled'); }
+      } else {
+        lastInference = null; generateBtn.disabled = true;
+      }
+    } catch (err) {
+      resultBox.textContent = 'Client error: ' + String(err);
+      lastInference = null; generateBtn.disabled = true;
+    }
+  });
+
+  // Clear handlers
+  $('clear-upload').addEventListener('click', ()=> {
+    xfileInput.value=''; ctfileInput.value=''; $('text_upload').value='';
+    resultBox.textContent='No result yet.'; imagesDiv.innerHTML=''; lastInference=null; generateBtn.disabled=true; linkLatest.classList.add('disabled');
+  });
+  $('clear-path').addEventListener('click', ()=> {
+    $('xray_path').value=''; $('ct_path').value=''; $('text_path').value='';
+    resultBox.textContent='No result yet.'; imagesDiv.innerHTML=''; lastInference=null; generateBtn.disabled=true; linkLatest.classList.add('disabled');
+  });
+
+  // Generate PDF (server endpoint required). tolerant to both pdf_url and report_url keys
+  generateBtn.addEventListener('click', async () => {
+    if (!lastInference) { alert('Run inference first'); return; }
+    generateBtn.disabled = true;
+    const origHTML = generateBtn.innerHTML;
+    generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Generating...';
+    try {
+      const payload = { inference: lastInference, simulate: true };
+      const { ok, data } = await safeFetch('/api/generate-report/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!ok) {
+        resultBox.textContent = 'Report error: ' + JSON.stringify(data, null, 2);
+        return;
+      }
+      // server may return pdf_url or report_url
+      const pdfUrl = data.pdf_url || data.report_url || data.reportUrl || data.pdfUrl;
+      if (pdfUrl) {
+        resultBox.textContent = JSON.stringify({ message:'Report ready', pdf_url: pdfUrl }, null, 2);
+        // try open in new tab
+        window.open(pdfUrl, '_blank');
+        linkLatest.href = pdfUrl; linkLatest.classList.remove('disabled');
+      } else {
+        resultBox.textContent = 'Server returned no pdf_url: ' + JSON.stringify(data, null, 2);
+      }
+    } catch (err) {
+      resultBox.textContent = 'Client error: ' + String(err);
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.innerHTML = origHTML;
+    }
+  });
+
+  // Simulate report — quick demo that sets artificial values in the result (client-side)
+  $('simulate-report').addEventListener('click', ()=> {
+    const demo = {
+      predicted_label: "NORMAL",
+      confidence: 0.9739,
+      used_ct: true,
+      bacterial_prob: 0.08,
+      viral_prob: 0.12,
+      severity_score: 0.08,
+      xray_gradcam: "/static/demo/gradcam_xray.png",
+      xray_segmentation: "/static/demo/seg_xray.png",
+      ct_gradcam: "/static/demo/gradcam_ct.png",
+      ct_segmentation: "/static/demo/seg_ct.png"
+    };
+    resultBox.textContent = JSON.stringify(demo, null, 2);
+    lastInference = demo;
+    showImages(demo);
+    generateBtn.disabled = false;
+    linkLatest.classList.add('disabled');
+  });
+
+  // small UX: preview selected files temporarily
+  function previewFile(inputEl, title){
+    if (!inputEl.files || inputEl.files.length===0) return;
+    const f = inputEl.files[0]; const url = URL.createObjectURL(f);
+    const card = document.createElement('div'); card.className='img-card';
+    const t = document.createElement('div'); t.textContent = title; t.style.fontWeight='600';
+    const img = document.createElement('img'); img.src = url; img.alt = f.name;
+    card.appendChild(t); card.appendChild(img);
+    // remove previous selected preview of same type
+    const existing = imagesDiv.querySelector('[data-selected="'+title+'"]');
+    if (existing) existing.remove();
+    card.dataset.selected = title;
+    imagesDiv.insertBefore(card, imagesDiv.firstChild);
+    img.onload = () => URL.revokeObjectURL(url);
+  }
+  xfileInput.addEventListener('change', ()=> previewFile(xfileInput,'X-ray (selected)'));
+  ctfileInput.addEventListener('change', ()=> previewFile(ctfileInput,'CT (selected)'));
+
+})();
+</script>
+</body>
+</html>

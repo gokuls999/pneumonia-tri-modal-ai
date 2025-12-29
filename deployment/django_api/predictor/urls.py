@@ -1,7 +1,6 @@
 from django.urls import path
-from .views import PredictView, PredictPageView
+from .simple_views import SimpleTriPageView
 
 urlpatterns = [
-    path("", PredictPageView.as_view(), name="predict-ui"),
-    path("predict/", PredictView.as_view(), name="predict"),
+    path("", SimpleTriPageView.as_view(), name="tri-page"),
 ]

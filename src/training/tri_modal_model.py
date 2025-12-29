@@ -1,3 +1,4 @@
+# src/training/tri_modal_model.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,10 +8,10 @@ from transformers import AutoModel
 
 class TriModalPneumoniaNet(nn.Module):
     """
-    True tri-modal network:
-      - X-ray image  → DenseNet121 backbone (3-channel)
-      - CT image     → ResNet18 backbone modified to 1-channel
-      - Text         → BERT encoder
+    Tri-modal network:
+      - X-ray image  → DenseNet121 backbone (expects 3-channel input)
+      - CT image     → ResNet18 backbone modified to accept 1-channel
+      - Text         → BERT encoder (AutoModel)
 
     Forward:
       logits = model(xray_img, ct_img, input_ids, attention_mask)
@@ -27,29 +28,32 @@ class TriModalPneumoniaNet(nn.Module):
         # -------- X-RAY BACKBONE (DenseNet121) --------
         densenet = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
         self.xray_features = densenet.features
-        self.xray_num_ftrs = densenet.classifier.in_features  # 1024
+        self.xray_num_ftrs = densenet.classifier.in_features  # typically 1024
 
+        # keep a handle to the features module for Grad-CAM
         self.xray_backbone_for_cam = self.xray_features
 
         # -------- CT BACKBONE (ResNet18, 1-channel) --------
         resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
-        # change first conv to 1 channel (for grayscale CT)
-        if resnet.conv1.in_channels != 1:
+        # Replace first conv to accept 1 channel but keep other conv1 properties
+        orig_conv = resnet.conv1
+        if orig_conv.in_channels != 1:
             resnet.conv1 = nn.Conv2d(
-                1,
-                resnet.conv1.out_channels,
-                kernel_size=resnet.conv1.kernel_size,
-                stride=resnet.conv1.stride,
-                padding=resnet.conv1.padding,
+                in_channels=1,
+                out_channels=orig_conv.out_channels,   # keep original out_channels (usually 64)
+                kernel_size=orig_conv.kernel_size,     # keep original kernel (usually (7,7))
+                stride=orig_conv.stride,
+                padding=orig_conv.padding,
                 bias=False,
             )
 
-        # keep everything except the final fc
+        # Use the ResNet layers up to avgpool as ct backbone
+        # `list(resnet.children())[:-1]` gives everything except final fc
         self.ct_backbone = nn.Sequential(*list(resnet.children())[:-1])  # -> (B, 512, 1, 1)
-        self.ct_num_ftrs = resnet.fc.in_features  # 512
+        self.ct_num_ftrs = resnet.fc.in_features  # typically 512
 
-        # 🔍 BUT for Grad-CAM we want the conv feature map BEFORE avgpool → ResNet layer4 (shape ~ 7x7)
+        # For Grad-CAM we want the conv feature map BEFORE avgpool → layer4
         self.ct_backbone_for_cam = resnet.layer4
 
         # -------- TEXT BACKBONE (BERT) --------
@@ -58,27 +62,27 @@ class TriModalPneumoniaNet(nn.Module):
 
         # -------- FUSION LAYERS --------
         fusion_input_dim = self.xray_num_ftrs + self.ct_num_ftrs + self.text_hidden_size
-
         self.fusion_fc1 = nn.Linear(fusion_input_dim, fused_hidden_size)
         self.fusion_dropout = nn.Dropout(p=0.3)
         self.fusion_fc_out = nn.Linear(fused_hidden_size, num_classes)
 
     def forward(self, xray_img, ct_img, input_ids, attention_mask):
         """
-        xray_img:   (B, 1, 224, 224)  -> we convert to 3-channel
-        ct_img:     (B, 1, 224, 224)  -> stays 1-channel for modified ResNet
+        xray_img:   (B, 1 or 3, H, W)  -> will convert to 3-channel if needed
+        ct_img:     (B, 1, H, W)        -> 1-channel for modified ResNet
         input_ids:  (B, L)
         attention_mask: (B, L)
         """
 
         # ----- PREPROCESS CHANNELS -----
-
-        # X-RAY: DenseNet expects 3 channels → repeat grayscale to (B, 3, H, W)
+        # If xray is single-channel, replicate to 3 channels (DenseNet expects 3)
+        if xray_img.dim() == 3:
+            # (C,H,W) → (1,C,H,W) handled outside usually; still safe-check
+            xray_img = xray_img.unsqueeze(0)
         if xray_img.shape[1] == 1:
             xray_img = xray_img.repeat(1, 3, 1, 1)
 
-        # CT: ResNet conv1 was changed to accept 1 channel, so we DO NOT repeat
-        # ct_img stays (B, 1, H, W)
+        # ct_img expected as (B,1,H,W) — keep as-is
 
         # ----- X-RAY BRANCH -----
         x = self.xray_features(xray_img)                 # (B, C, H, W)
@@ -95,11 +99,11 @@ class TriModalPneumoniaNet(nn.Module):
             input_ids=input_ids,
             attention_mask=attention_mask,
         )
-
+        # AutoModel returns either pooler_output or last_hidden_state
         if hasattr(text_outputs, "pooler_output") and text_outputs.pooler_output is not None:
-            text_feat = text_outputs.pooler_output       # (B, 768)
+            text_feat = text_outputs.pooler_output       # (B, hidden)
         else:
-            text_feat = text_outputs.last_hidden_state[:, 0, :]  # (B, 768)
+            text_feat = text_outputs.last_hidden_state[:, 0, :]  # CLS token
 
         # ----- FUSION -----
         fused = torch.cat([xray_feat, ct_feat, text_feat], dim=1)
